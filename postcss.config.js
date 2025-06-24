@@ -1,7 +1,7 @@
-// ✅ postcss.config.js compatible con "type": "module"
+// ✅ postcss.config.js actualizado para nueva versión de Tailwind
+import tailwindcss from '@tailwindcss/postcss';
+import autoprefixer from 'autoprefixer';
+
 export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
+  plugins: [tailwindcss(), autoprefixer()],
 };

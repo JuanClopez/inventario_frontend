@@ -1,83 +1,84 @@
-// ✅ src/pages/Login.jsx
-// Página de Login con autenticación por JWT y conexión a backend
-
+// ✅ src/pages/Login.jsx – Login centrado y responsive
 import { useState } from 'react';
 import api from '@/services/api';
 
 const Login = () => {
-  // 🧠 Estado para formulario y errores
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mensaje, setMensaje] = useState('');
 
-  // 🟢 Acción al enviar el formulario
   const handleLogin = async (e) => {
     e.preventDefault();
     setMensaje('');
-
     try {
       const res = await api.post('/login', { email, password });
       const { token } = res.data;
-
-      // 💾 Guardar el token en localStorage
       localStorage.setItem('token', token);
-
-      // 🔁 Redirigir (temporal: recarga la página, luego usaremos react-router)
-      window.location.reload();
+      window.location.reload(); // Temporal
     } catch (error) {
-      // ❌ Error en login
       const msg = error.response?.data?.mensaje || 'Error al iniciar sesión';
       setMensaje(msg);
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form
-        onSubmit={handleLogin}
-        className="bg-white p-8 rounded shadow-md w-full max-w-sm space-y-4"
-      >
-        <h2 className="text-2xl font-bold text-center">Iniciar Sesión</h2>
+ return (
+  <main className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+    {/* Este bloque ya NO tiene w-full */}
+    <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-xl">
+      <h1 className="text-3xl font-bold text-blue-600 text-center">Iniciar Sesión</h1>
+      <p className="text-center text-gray-500 text-sm mb-6">
+        Ingresa tus credenciales para continuar
+      </p>
 
-        {/* Input: Email */}
+      <form onSubmit={handleLogin} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Correo</label>
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            Correo electrónico
+          </label>
           <input
+            id="email"
             type="email"
-            className="mt-1 block w-full border border-gray-300 rounded p-2"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            placeholder="usuario@ejemplo.com"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-600"
           />
         </div>
 
-        {/* Input: Contraseña */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Contraseña</label>
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            Contraseña
+          </label>
           <input
+            id="password"
             type="password"
-            className="mt-1 block w-full border border-gray-300 rounded p-2"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            placeholder="••••••••"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-600"
           />
         </div>
 
-        {/* Botón */}
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
+          className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-colors"
         >
           Ingresar
         </button>
 
-        {/* Mensaje de error */}
         {mensaje && (
-          <div className="text-red-600 text-center text-sm">{mensaje}</div>
+          <p className="text-sm text-center text-red-600">{mensaje}</p>
         )}
       </form>
-    </div>
-  );
-};
 
+      <p className="text-xs text-center text-gray-400 mt-6">
+        © {new Date().getFullYear()} Sistema de Inventario Probien
+      </p>
+    </div>
+  </main>
+);
+
+}
 export default Login;
