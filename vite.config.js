@@ -1,17 +1,18 @@
-// ✅ vite.config.js – Configuración Vite con Tailwind v4 y React
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite'; // ✅ Plugin oficial de Tailwind para Vite
-import path from 'path';
+// ✅ vite.config.js — Configuración optimizada para Vite + TailwindCSS 4.1 + React (Versión 1.1 – 26 jun 2025)
+
+import { defineConfig } from 'vite';                 // 🧠 Configuración base de Vite
+import react from '@vitejs/plugin-react';            // ⚛️ Soporte para React y JSX
+import tailwindcss from '@tailwindcss/vite';         // 🎨 Plugin oficial para Tailwind CSS (v4+ sin PostCSS)
+import path from 'path';                             // 🗂️ Módulo para rutas absolutas (alias "@")
 
 export default defineConfig({
   plugins: [
-    react(),           // Soporte para React
-    tailwindcss(),     // Tailwind integrado con Vite sin PostCSS externo
+    react(),           // ✅ React + JSX + Fast Refresh
+    tailwindcss(),     // ✅ TailwindCSS activado como plugin moderno
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'), // ✅ Importaciones absolutas desde src
+      '@': path.resolve(__dirname, './src'), // ✅ Alias para usar "@/components/..." en vez de rutas relativas largas
     },
   },
 });

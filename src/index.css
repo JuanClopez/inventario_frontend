@@ -1,42 +1,38 @@
-/* ✅ src/index.css – Tailwind 4 + Vite limpio y funcional */
+/* ✅ src/index.css — Tailwind CSS 4.1 + Vite Configurado (Versión 1.0 - 26 jun 2025) */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Importación oficial de Tailwind v4.1 */
+@import "tailwindcss";
 
-/* 🎨 Estilos base */
-html, body {
+/* 🎨 Estilos base para todo el documento */
+html,
+body {
   min-height: 100%;
-  font-family: 'Inter', system-ui, sans-serif;
-  background-color: #f8f9fa;
-  color: #374151;
+  font-family: "Inter", system-ui, sans-serif;
+  background-color: #f8f9fa; /* Fondo general gris claro */
+  color: #374151; /* Texto principal - gray-700 */
   margin: 0;
   padding: 0;
   scroll-behavior: smooth;
 }
 
-/* 🔗 Estilos de enlaces */
+/* 🔗 Enlaces generales con transición y color primario */
 a {
   font-weight: 500;
-  color: #2563eb;
+  color: #2563eb; /* Azul base - blue-600 */
   text-decoration: none;
+  transition: color 0.2s ease-in-out;
 }
 a:hover {
-  color: #1d4ed8;
+  color: #1d4ed8; /* Azul más oscuro - blue-700 */
 }
 
-/* 🧱 Clase reutilizable sin usar @apply directamente */
+/* 🧱 Botón base reutilizable: .btn-base */
 .btn-base {
-  border-radius: 0.375rem; /* rounded-md */
-  padding-left: 1rem; /* px-4 */
-  padding-right: 1rem;
-  padding-top: 0.5rem; /* py-2 */
-  padding-bottom: 0.5rem;
-  color: white;
-  background-color: #2563eb; /* bg-blue-600 */
-  font-weight: 500;
-  transition: background-color 0.3s ease;
+  @apply rounded-md px-4 py-2 text-white font-medium transition-colors duration-300;
+  background-color: #2563eb; /* Azul base */
 }
 .btn-base:hover {
-  background-color: #1d4ed8; /* bg-blue-700 */
+  background-color: #1d4ed8; /* Azul más oscuro al hacer hover */
 }
+
+/* 🧩 Espacio para clases utilitarias personalizadas adicionales */
