@@ -14,6 +14,7 @@ const Login = () => {
 
     try {
       const res = await api.post('/login', { email, password });
+      console.log('📦 Respuesta del backend:', res.data);
       const { token } = res.data;
       localStorage.setItem('token', token);
       window.location.reload();
