@@ -1,18 +1,22 @@
 // ✅ src/App.jsx
-// App principal que carga el Login directamente, útil para pruebas de estilos
+// App principal del frontend de inventario Probien
+// Carga el componente <Login /> como vista inicial (puede cambiarse más adelante por routing)
 
-import './index.css'; // Aseguramos que los estilos globales de Tailwind se carguen
+// 🎨 Estilos globales definidos en index.css (Tailwind + estilos base)
+import './index.css';
+
+// 🧩 Página de inicio actual (Login)
 import Login from './pages/Login';
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="w-full max-w-md bg-white p-6 rounded-lg shadow-md">
+    <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+      {/* 💻 Contenedor principal centrado con padding y sombra */}
+      <section className="w-full max-w-md bg-white p-6 rounded-xl shadow-lg">
         <Login />
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
 
 export default App;
-
