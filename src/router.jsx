@@ -1,34 +1,41 @@
-// ✅ src/router.jsx
-// Configura las rutas principales de la app usando React Router DOM 6
-// con soporte para rutas protegidas y estructura escalable
+// ✅ src/router.jsx – Versión 1.5 (28 jun 2025)
+// Configura las rutas principales con soporte para:
+// 🔐 Login público, 🧱 Layout con Sidebar, y rutas protegidas con token
+// 🧩 Se agregó la ruta protegida /movimientos
 
 import { createBrowserRouter } from 'react-router-dom';
-import Login from '@/pages/Login';
-import Dashboard from '@/pages/Dashboard';
-import PrivateRoute from '@/routes/PrivateRoute'; // Ruta protegida
+import Login from '@/pages/Login';                     
+import Dashboard from '@/pages/Dashboard';             
+import Movimientos from '@/pages/Movimientos'; // ✅ Nuevo módulo
+import PrivateRoute from '@/routes/PrivateRoute';      
+import LayoutBase from '@/layouts/LayoutBase';         
 
 const router = createBrowserRouter([
   {
-    path: '/',
-    element: <Login />, // 🔐 Página pública de inicio de sesión
+    path: '/', // 🔓 Ruta pública: Login
+    element: <Login />,
   },
   {
-    path: '/dashboard',
+    path: '/', // 🔐 Ruta protegida: requiere token
     element: (
       <PrivateRoute>
-        <Dashboard /> {/* 🔒 Página protegida solo accesible con token */}
+        <LayoutBase /> {/* 🧱 Layout con Sidebar + Outlet */}
       </PrivateRoute>
     ),
+    children: [
+      {
+        path: 'dashboard',
+        element: <Dashboard />,
+      },
+      {
+        path: 'movimientos', // ✅ Nueva ruta protegida
+        element: <Movimientos />,
+      },
+      // Puedes seguir agregando:
+      // { path: 'productos', element: <Productos /> },
+      // { path: 'reportes', element: <Reportes /> },
+    ],
   },
-  // Aquí puedes agregar otras rutas protegidas más adelante:
-  // {
-  //   path: '/inventario',
-  //   element: (
-  //     <PrivateRoute>
-  //       <Inventario />
-  //     </PrivateRoute>
-  //   ),
-  // },
 ]);
 
 export default router;

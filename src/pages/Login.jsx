@@ -1,12 +1,15 @@
-// ✅ Login.jsx – Pantalla de inicio de sesión con diseño moderno (Versión 1.1 – 26 jun 2025)
+// ✅ src/pages/Login.jsx – Pantalla de inicio de sesión
+// Versión 1.3 – Guarda token + userData en localStorage y redirige al dashboard
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mensaje, setMensaje] = useState('');
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -14,10 +17,12 @@ const Login = () => {
 
     try {
       const res = await api.post('/login', { email, password });
-      console.log('📦 Respuesta del backend:', res.data);
-      const { token } = res.data;
-      localStorage.setItem('token', token);
-      window.location.reload();
+      const { token, user } = res.data;
+
+      localStorage.setItem('token', token); // ✅ Guardar token
+      localStorage.setItem('userData', JSON.stringify({ user })); // ✅ Guardar usuario completo
+
+      navigate('/dashboard');
     } catch (error) {
       const msg = error.response?.data?.mensaje || 'Error al iniciar sesión';
       setMensaje(msg);
@@ -35,7 +40,6 @@ const Login = () => {
         </p>
 
         <form onSubmit={handleLogin} className="space-y-5">
-          {/* Campo: Correo */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               Correo electrónico
@@ -51,7 +55,6 @@ const Login = () => {
             />
           </div>
 
-          {/* Campo: Contraseña */}
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
               Contraseña
@@ -67,18 +70,15 @@ const Login = () => {
             />
           </div>
 
-          {/* Botón principal con clase btn-base definida en index.css */}
           <button type="submit" className="w-full btn-base text-center">
             Ingresar
           </button>
 
-          {/* Mensaje de error */}
           {mensaje && (
             <p className="text-sm text-center text-red-600">{mensaje}</p>
           )}
         </form>
 
-        {/* Footer */}
         <p className="text-xs text-center text-gray-400 mt-6">
           © {new Date().getFullYear()} Sistema de Inventario Probien
         </p>

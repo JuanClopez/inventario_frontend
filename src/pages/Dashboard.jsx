@@ -1,4 +1,4 @@
-// ✅ src/pages/Dashboard.jsx – Vista principal con resumen visual e inventario
+// ✅ src/pages/Dashboard.jsx – Vista principal con resumen visual e inventario (Versión 1.1 – 27 jun 2025)
 
 import { useEffect, useState } from 'react';
 import api from '@/services/api';
@@ -56,7 +56,6 @@ const Dashboard = () => {
         <div className="bg-white rounded-lg shadow-md p-4 text-center">
           <h2 className="text-lg font-semibold text-gray-600">Ventas del mes</h2>
           <p className="text-2xl text-green-600 font-bold">📦 0</p>
-          {/* Puedes conectar esto a otra ruta del backend más adelante */}
         </div>
         <div className="bg-white rounded-lg shadow-md p-4 text-center">
           <h2 className="text-lg font-semibold text-gray-600">Movimientos</h2>
