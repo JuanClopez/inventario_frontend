@@ -1,6 +1,5 @@
-// ✅ src/pages/Login.jsx – Versión 1.6 (29 jun 2025)
-// 🔐 Mejora: Asegura carga completa del perfil (incluye role) y avatar genérico por defecto
-// 📌 Estilo alineado a políticas internas de Probien
+// ✅ src/pages/Login.jsx – Pantalla de inicio de sesión
+// Versión 1.3 – Guarda token + userData en localStorage y redirige al dashboard
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -17,40 +16,12 @@ const Login = () => {
     setMensaje('');
 
     try {
-      // 🔐 1. Solicitar autenticación y token
       const res = await api.post('/login', { email, password });
       const { token, user } = res.data;
 
-      // 🧠 2. Obtener perfil extendido (nombre, apellido, avatar, rol)
-      const perfilRes = await api.get('/usuarios/perfil', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      localStorage.setItem('token', token); // ✅ Guardar token
+      localStorage.setItem('userData', JSON.stringify({ user })); // ✅ Guardar usuario completo
 
-      console.log("👤 Perfil cargado desde Supabase:", perfilRes.data);
-      const perfil = perfilRes.data;
-
-      // 🧱 3. Construir datos del usuario
-      const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-        perfil.first_name + ' ' + perfil.last_name
-      )}&background=0D8ABC&color=fff`;
-
-      const userData = {
-        user: {
-          id: user.id,
-          email: user.email,
-          first_name: perfil.first_name || '',
-          last_name: perfil.last_name || '',
-          role: perfil.role || 'Sin rol',
-          avatar_url: perfil.avatar_url || avatarFallback
-        },
-        token
-      };
-
-      // 💾 4. Guardar en localStorage
-      localStorage.setItem('token', token);
-      localStorage.setItem('userData', JSON.stringify(userData));
-
-      // 🚀 5. Redirigir al Dashboard
       navigate('/dashboard');
     } catch (error) {
       const msg = error.response?.data?.mensaje || 'Error al iniciar sesión';
