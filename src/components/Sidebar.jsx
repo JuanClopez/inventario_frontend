@@ -1,6 +1,8 @@
-// ✅ src/components/Sidebar.jsx – Versión 2.1 (29 jun 2025)
+// ✅ src/components/Sidebar.jsx – Versión 2.3 (29 jun 2025)
 // 👤 Muestra nombre, apellido, avatar y cargo del usuario
-// ✅ Limpia advertencia ESLint sobre Icon no usado
+// ✅ Oculta menú “Productos” a usuarios no admin
+// ✅ Renombra “Reportes” a “Inventario”
+// ✅ Ruta actualizada a /inventario
 
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
@@ -12,15 +14,8 @@ import {
   Cog6ToothIcon,
   Bars3Icon,
   XMarkIcon,
+  ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
-
-const navItems = [
-  { name: 'Dashboard', icon: HomeIcon, to: '/dashboard' },
-  { name: 'Movimientos', icon: DocumentTextIcon, to: '/movimientos' },
-  { name: 'Productos', icon: CubeIcon, to: '/productos' },
-  { name: 'Reportes', icon: ChartBarIcon, to: '/reportes' },
-  { name: 'Configuración', icon: Cog6ToothIcon, to: '/configuracion' },
-];
 
 const Sidebar = () => {
   const [open, setOpen] = useState(false);
@@ -78,23 +73,49 @@ const Sidebar = () => {
 
         {/* 📚 Navegación */}
         <nav className="space-y-2 flex-grow">
-          {/* eslint-disable-next-line no-unused-vars */}
-          {navItems.map(({ name, icon: Icon, to }) => (
-            <NavLink
-              key={name}
-              to={to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors
-                ${isActive ? 'bg-white text-blue-700' : 'text-white hover:bg-white hover:text-blue-700'}`
-              }
-            >
-              <Icon className="h-5 w-5" />
-              {name}
+          <NavLink to="/dashboard" className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors
+             ${isActive ? 'bg-white text-blue-700' : 'text-white hover:bg-white hover:text-blue-700'}`
+          }>
+            <HomeIcon className="h-5 w-5" />
+            Dashboard
+          </NavLink>
+
+          <NavLink to="/movimientos" className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors
+             ${isActive ? 'bg-white text-blue-700' : 'text-white hover:bg-white hover:text-blue-700'}`
+          }>
+            <DocumentTextIcon className="h-5 w-5" />
+            Movimientos
+          </NavLink>
+
+          {perfil.role === 'admin' && (
+            <NavLink to="/productos" className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors
+               ${isActive ? 'bg-white text-blue-700' : 'text-white hover:bg-white hover:text-blue-700'}`
+            }>
+              <CubeIcon className="h-5 w-5" />
+              Productos
             </NavLink>
-          ))}
+          )}
+
+          <NavLink to="/inventario" className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors
+             ${isActive ? 'bg-white text-blue-700' : 'text-white hover:bg-white hover:text-blue-700'}`
+          }>
+            <ArchiveBoxIcon className="h-5 w-5" />
+            Inventario
+          </NavLink>
+
+          <NavLink to="/configuracion" className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors
+             ${isActive ? 'bg-white text-blue-700' : 'text-white hover:bg-white hover:text-blue-700'}`
+          }>
+            <Cog6ToothIcon className="h-5 w-5" />
+            Configuración
+          </NavLink>
         </nav>
 
-        {/* 🔒 Cerrar sesión */}
         <button
           onClick={() => {
             localStorage.clear();
