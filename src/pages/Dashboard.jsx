@@ -1,16 +1,20 @@
-// ✅ src/pages/Dashboard.jsx – Versión 2.1 (29 jun 2025)
-// ✅ Corrige visualización de productos bajo stock usando el backend
+// ✅ src/pages/Dashboard.jsx – Versión 2.2 (01 jul 2025)
+// ✅ Integrado componente <ResumenVentas /> con análisis de ventas mensuales
+// ✅ Compatible con selector de mes
+// ✅ Conserva visualización de stock, movimientos y futuras gráficas
 
 import { useEffect, useState } from 'react';
 import api from '@/services/api';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
+import ResumenVentas from '@/components/ResumenVentas'; // 🆕 Componente resumen mensual
 
 const Dashboard = () => {
   const [resumen, setResumen] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [nombreUsuario, setNombreUsuario] = useState('');
+  const [userId, setUserId] = useState(null); // 🆕
 
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('userData'));
@@ -22,6 +26,7 @@ const Dashboard = () => {
 
     const { id, first_name } = userData.user;
     setNombreUsuario(first_name || '');
+    setUserId(id); // 🆕
 
     api
       .get(`/dashboard?user_id=${id}`)
@@ -53,6 +58,9 @@ const Dashboard = () => {
         </h1>
         <p className="text-gray-600">Resumen general de tus productos y movimientos</p>
       </section>
+
+      {/* 📊 Resumen mensual de ventas */}
+      {userId && <ResumenVentas userId={userId} />}
 
       {/* 💡 Tarjetas resumen */}
       <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">

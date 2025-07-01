@@ -1,8 +1,8 @@
-// ✅ src/components/Sidebar.jsx – Versión 2.3 (29 jun 2025)
+// ✅ src/components/Sidebar.jsx – Versión 2.4 (01 jul 2025)
 // 👤 Muestra nombre, apellido, avatar y cargo del usuario
 // ✅ Oculta menú “Productos” a usuarios no admin
 // ✅ Renombra “Reportes” a “Inventario”
-// ✅ Ruta actualizada a /inventario
+// ✅ Agrega ruta “Ventas” (/ventas)
 
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
@@ -14,7 +14,8 @@ import {
   Cog6ToothIcon,
   Bars3Icon,
   XMarkIcon,
-  ArchiveBoxIcon
+  ArchiveBoxIcon,
+  ShoppingCartIcon // 🛒 Icono para ventas
 } from '@heroicons/react/24/outline';
 
 const Sidebar = () => {
@@ -105,6 +106,14 @@ const Sidebar = () => {
           }>
             <ArchiveBoxIcon className="h-5 w-5" />
             Inventario
+          </NavLink>
+
+          <NavLink to="/ventas" className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors
+             ${isActive ? 'bg-white text-blue-700' : 'text-white hover:bg-white hover:text-blue-700'}`
+          }>
+            <ShoppingCartIcon className="h-5 w-5" />
+            Ventas
           </NavLink>
 
           <NavLink to="/configuracion" className={({ isActive }) =>
