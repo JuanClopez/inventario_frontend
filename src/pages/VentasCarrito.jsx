@@ -1,6 +1,7 @@
-// ✅ src/pages/VentasCarrito.jsx – Versión 1.2 (01 jul 2025)
-// 🛒 Página de ventas agrupadas con precio, IVA, descuento y control de stock
-// ⚠️ No permite agregar si la cantidad excede el inventario del producto
+// ✅ src/pages/VentasCarrito.jsx – Versión 1.4 (02 jul 2025)
+// 🛒 Página de ventas agrupadas con precio, IVA y descuento por producto
+// ✅ Descuento ahora se aplica como porcentaje y se calcula correctamente
+// ✅ Se mantiene el campo de descripción para toda la venta
 
 import { useEffect, useState } from 'react';
 import api from '@/services/api';
@@ -11,7 +12,7 @@ const VentasCarrito = () => {
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [familiaSeleccionada, setFamiliaSeleccionada] = useState('');
   const [cantidadCajas, setCantidadCajas] = useState(1);
-  const [descuento, setDescuento] = useState(0);
+  const [descuento, setDescuento] = useState(0); // porcentaje (%)
   const [precio, setPrecio] = useState(null);
   const [iva, setIva] = useState(0);
   const [stock, setStock] = useState(null);
@@ -19,6 +20,7 @@ const VentasCarrito = () => {
   const [carrito, setCarrito] = useState([]);
   const [mensaje, setMensaje] = useState('');
   const [cargando, setCargando] = useState(false);
+  const [descripcionVenta, setDescripcionVenta] = useState('');
 
   const userData = JSON.parse(localStorage.getItem('userData'));
   const user_id = userData?.user?.id;
@@ -86,7 +88,7 @@ const VentasCarrito = () => {
     const unitPrice = precio;
     const subtotal = unitPrice * cantidadCajas;
     const ivaAmount = (subtotal * iva) / 100;
-    const descuentoTotal = descuento;
+    const descuentoTotal = (subtotal * descuento) / 100; // ✅ Cálculo en porcentaje
     const total = subtotal + ivaAmount - descuentoTotal;
 
     setCarrito([
@@ -99,7 +101,8 @@ const VentasCarrito = () => {
         unitPrice,
         descuento: descuentoTotal,
         iva: ivaAmount,
-        total
+        total,
+        descuentoPorcentaje: descuento // Guardamos también el porcentaje original
       }
     ]);
 
@@ -129,13 +132,18 @@ const VentasCarrito = () => {
         product_id: item.producto_id,
         quantity_boxes: item.cantidad,
         quantity_units: 0,
-        discount: item.descuento
+        discount: item.descuento // 💲 se guarda el total descontado
       }));
 
-      await api.post('/ventas', { user_id, items });
+      await api.post('/ventas', {
+        user_id,
+        items,
+        description: descripcionVenta
+      });
 
       setMensaje('✅ Venta registrada con éxito');
       setCarrito([]);
+      setDescripcionVenta('');
     } catch (err) {
       setMensaje('❌ Error al registrar la venta');
       console.error(err);
@@ -200,11 +208,12 @@ const VentasCarrito = () => {
           />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-gray-600 mb-1">Descuento total ($)</label>
+          <label className="block text-sm font-semibold text-gray-600 mb-1">Descuento por producto (%) – si aplica</label>
           <input
             type="number"
             value={descuento}
-            onChange={(e) => setDescuento(Number(e.target.value))}
+            onChange={(e) => setDescuento(Math.max(0, Number(e.target.value)))}
+            min={0}
             className="w-full border rounded px-3 py-2"
           />
         </div>
@@ -233,7 +242,7 @@ const VentasCarrito = () => {
                   <th className="px-2 py-2">Cajas</th>
                   <th className="px-2 py-2">Precio unitario</th>
                   <th className="px-2 py-2">IVA</th>
-                  <th className="px-2 py-2">Descuento</th>
+                  <th className="px-2 py-2">Descuento (%)</th>
                   <th className="px-2 py-2">Total</th>
                   <th></th>
                 </tr>
@@ -246,7 +255,7 @@ const VentasCarrito = () => {
                     <td>{item.cantidad}</td>
                     <td>${item.unitPrice.toFixed(2)}</td>
                     <td>${item.iva.toFixed(2)}</td>
-                    <td>${item.descuento.toFixed(2)}</td>
+                    <td>{item.descuentoPorcentaje}%</td>
                     <td>${item.total.toFixed(2)}</td>
                     <td>
                       <button
@@ -264,6 +273,17 @@ const VentasCarrito = () => {
 
           <div className="text-right mt-4 text-blue-700 font-bold text-lg">
             Total: ${totalVenta.toFixed(2)}
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-semibold text-gray-600 mb-1">Descripción de la venta (opcional)</label>
+            <input
+              type="text"
+              value={descripcionVenta}
+              onChange={(e) => setDescripcionVenta(e.target.value)}
+              className="w-full border rounded px-3 py-2"
+              placeholder="Ej: Nombre Cliente / Vendido Promoción Julio 2025"
+            />
           </div>
 
           <button

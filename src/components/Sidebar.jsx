@@ -1,8 +1,7 @@
-// ✅ src/components/Sidebar.jsx – Versión 2.4 (01 jul 2025)
-// 👤 Muestra nombre, apellido, avatar y cargo del usuario
-// ✅ Oculta menú “Productos” a usuarios no admin
-// ✅ Renombra “Reportes” a “Inventario”
-// ✅ Agrega ruta “Ventas” (/ventas)
+// ✅ src/components/Sidebar.jsx – Versión 2.6 (03 jul 2025)
+// 🛠️ Agrega opción "Precios" en menú para todos los usuarios
+// ✅ Sidebar siempre visible en escritorio y deslizable en móvil
+// ✅ Conserva diseño y políticas de visibilidad
 
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
@@ -15,7 +14,8 @@ import {
   Bars3Icon,
   XMarkIcon,
   ArchiveBoxIcon,
-  ShoppingCartIcon // 🛒 Icono para ventas
+  ShoppingCartIcon,
+  CurrencyDollarIcon, // 👈 Asegúrate que este icono esté disponible
 } from '@heroicons/react/24/outline';
 
 const Sidebar = () => {
@@ -47,11 +47,13 @@ const Sidebar = () => {
         </button>
       </div>
 
-      {/* 🧱 Sidebar */}
+      {/* 🧱 Sidebar general */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen w-64 bg-blue-700 text-white flex flex-col p-6 transform transition-transform duration-300
-        ${open ? 'translate-x-0' : '-translate-x-full'} 
-        lg:translate-x-0 lg:relative lg:flex`}
+        className={`
+          z-40 w-64 bg-blue-700 text-white flex flex-col p-6 transition-transform duration-300
+          ${open ? 'translate-x-0' : '-translate-x-full'}
+          fixed top-0 left-0 h-screen lg:sticky lg:top-0 lg:translate-x-0 lg:flex lg:h-screen
+        `}
       >
         {/* 👤 Perfil del usuario */}
         <div className="flex flex-col items-center mb-10 mt-10 lg:mt-0 text-center">
@@ -114,6 +116,15 @@ const Sidebar = () => {
           }>
             <ShoppingCartIcon className="h-5 w-5" />
             Ventas
+          </NavLink>
+
+          {/* 🆕 Opción de Precios */}
+          <NavLink to="/precios" className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors
+             ${isActive ? 'bg-white text-blue-700' : 'text-white hover:bg-white hover:text-blue-700'}`
+          }>
+            < CurrencyDollarIcon className="h-5 w-5" />
+            Precios
           </NavLink>
 
           <NavLink to="/configuracion" className={({ isActive }) =>

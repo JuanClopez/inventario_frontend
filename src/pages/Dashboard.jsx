@@ -1,13 +1,14 @@
-// ✅ src/pages/Dashboard.jsx – Versión 2.2 (01 jul 2025)
-// ✅ Integrado componente <ResumenVentas /> con análisis de ventas mensuales
-// ✅ Compatible con selector de mes
-// ✅ Conserva visualización de stock, movimientos y futuras gráficas
+// ✅ src/pages/Dashboard.jsx – Versión 2.3 (02 jul 2025)
+// ✅ Integrado componente <TopProductosChart /> con control de cantidad
+// ✅ Conserva visualización de resumen, stock y movimientos
+// ✅ Compatible con selector de mes y mantiene placeholder para gráficas futuras
 
 import { useEffect, useState } from 'react';
 import api from '@/services/api';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
-import ResumenVentas from '@/components/ResumenVentas'; // 🆕 Componente resumen mensual
+import ResumenVentas from '@/components/ResumenVentas'; // 📊 Componente resumen mensual
+import TopProductosChart from '@/components/TopProductosChart'; // 🆕 Gráfico productos más vendidos
 
 const Dashboard = () => {
   const [resumen, setResumen] = useState(null);
@@ -26,7 +27,7 @@ const Dashboard = () => {
 
     const { id, first_name } = userData.user;
     setNombreUsuario(first_name || '');
-    setUserId(id); // 🆕
+    setUserId(id);
 
     api
       .get(`/dashboard?user_id=${id}`)
@@ -113,10 +114,16 @@ const Dashboard = () => {
         )}
       </section>
 
-      {/* 📊 Placeholder para gráficas futuras */}
+      {/* 📈 Gráfica: Top productos más vendidos */}
       <section>
-        <h2 className="text-lg font-bold text-blue-700 mt-8 mb-2">📈 Próximamente: Productos más vendidos</h2>
-        <p className="text-gray-500">Se mostrará un gráfico de barras con los productos más vendidos este mes.</p>
+        <h2 className="text-lg font-bold text-blue-700 mt-8 mb-2">📈 Productos más vendidos del mes</h2>
+        {userId && <TopProductosChart userId={userId} />}
+      </section>
+
+      {/* 🔜 Placeholder para futuras comparativas */}
+      <section>
+        <h2 className="text-lg font-bold text-blue-700 mt-8 mb-2">📊 Próximamente: Comparativas por familia o meta</h2>
+        <p className="text-gray-500">Estamos trabajando en una gráfica comparativa por categorías o metas mensuales.</p>
       </section>
     </main>
   );

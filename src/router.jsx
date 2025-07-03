@@ -1,14 +1,16 @@
-// ✅ src/router.jsx – Versión 1.7 (01 jul 2025)
+// ✅ src/router.jsx – Versión 1.8 (03 jul 2025)
 // Configura las rutas principales con soporte para:
 // 🔐 Login público, 🧱 Layout con Sidebar, y rutas protegidas con token
-// 🧩 Rutas activas: dashboard, movimientos, inventario, ventas
+// 🧩 Rutas activas: dashboard, movimientos, inventario, ventas, precios
 
 import { createBrowserRouter } from 'react-router-dom';
+
 import Login from '@/pages/Login';                     
 import Dashboard from '@/pages/Dashboard';             
 import Movimientos from '@/pages/Movimientos';         
 import Inventario from '@/pages/Inventario';           
-import VentasCarrito from '@/pages/VentasCarrito';     // 🛒 Nuevo módulo
+import VentasCarrito from '@/pages/VentasCarrito';     
+import PreciosPage from '@/pages/PreciosPage';         // 🆕 Nueva importación
 
 import PrivateRoute from '@/routes/PrivateRoute';      
 import LayoutBase from '@/layouts/LayoutBase';         
@@ -39,8 +41,12 @@ const router = createBrowserRouter([
         element: <Inventario />,
       },
       {
-        path: 'ventas', // 🛒 Nueva ruta protegida para registrar ventas
+        path: 'ventas', // 🛒 Módulo de ventas
         element: <VentasCarrito />,
+      },
+      {
+        path: 'precios', // 🆕 Nueva ruta de precios
+        element: <PreciosPage />,
       },
     ],
   },
