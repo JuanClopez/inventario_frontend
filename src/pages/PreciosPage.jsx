@@ -1,6 +1,8 @@
-// ✅ src/pages/PreciosPage.jsx – Versión 1.9 (04 jul 2025)
-// 📄 Corrige redondeo exacto del precio final y base, aplica IVA por defecto a nuevos productos
-// 🔁 Soluciona problema de ocultamiento de productos sin precio luego de guardar
+// ✅ src/pages/PreciosPage.jsx – Versión 2.5 (06 jul 2025)
+// 🆕 Columna separada para presentación
+// 🛠️ Corrección de visualización de precios ya ingresados
+// ✅ Alineado con el backend post-migración (solo presentation_id)
+// 🧩 Política de componentes: Todos los cambios deben quedar comentados y con número de versión
 
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
@@ -9,6 +11,7 @@ import {
   asignarPrecioProducto,
 } from "../services/preciosService";
 import api from "@/services/api";
+import { obtenerPresentacionesPorProducto } from "@/services/presentacionesService";
 
 // ─────────── COMPONENTES UI ───────────
 const Table = ({ children }) => <table className="w-full border-collapse">{children}</table>;
@@ -73,57 +76,63 @@ const Switch = ({ checked, onCheckedChange }) => (
 const PreciosPage = () => {
   const [productos, setProductos] = useState([]);
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
+  const [presentaciones, setPresentaciones] = useState([]);
+  const [presentacionSeleccionada, setPresentacionSeleccionada] = useState("");
   const [modalAbierto, setModalAbierto] = useState(false);
   const [precioFinal, setPrecioFinal] = useState("");
   const [aplicaIVA, setAplicaIVA] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
-  const obtenerPrecios = async () => {
+  const cargarDatos = async () => {
     try {
-      const precios = await listarPreciosActivos();
-      setProductos(precios || []);
-    } catch (error) {
-      console.error("❌ Error al cargar precios:", error.message);
-    }
-  };
+      const { productos: preciosActivos } = await listarPreciosActivos(); // ✅ compatibilidad backend
 
-  const actualizarListadoProductos = async () => {
-    try {
       const res = await api.get("/productos");
-      const nuevos = res.data.map((prod) => ({
+      const productosAll = res.data;
+
+      const nuevos = productosAll.map((prod) => ({
         id: prod.id,
         nombre: prod.name,
         familia: prod.familia,
         base_price: null,
-        iva_applicable: true, // ✅ Aplica IVA por defecto
+        iva_applicable: true,
         updated_at: null,
+        presentacion: "",
       }));
-      setProductos((prev) => {
-        const idsExistentes = new Set(prev.map((p) => p.id));
-        const nuevosSinRepetir = nuevos.filter((p) => !idsExistentes.has(p.id));
-        return [...prev, ...nuevosSinRepetir];
-      });
-    } catch (err) {
-      console.error("❌ Error al cargar lista de productos:", err.message);
+
+      const sinRepetir = nuevos.filter(
+        (prod) =>
+          !preciosActivos.some((p) =>
+            p.nombre.startsWith(prod.nombre)
+          )
+      );
+
+      setProductos([...preciosActivos, ...sinRepetir]);
+    } catch (error) {
+      console.error("❌ Error al cargar datos:", error.message);
     }
   };
 
   useEffect(() => {
-    obtenerPrecios();
-    actualizarListadoProductos();
+    cargarDatos();
   }, []);
 
-  const abrirModal = (producto) => {
+  const abrirModal = async (producto) => {
     setProductoSeleccionado(producto);
-    const base = parseFloat(producto.base_price || 0);
-    const final = producto.iva_applicable ? base * 1.19 : base;
-    setPrecioFinal(Math.round(final).toString());
-    setAplicaIVA(producto.iva_applicable !== false);
-    setModalAbierto(true);
+    setPrecioFinal("");
+    setPresentacionSeleccionada("");
+    setAplicaIVA(true);
+    try {
+      const presentaciones = await obtenerPresentacionesPorProducto(producto.id);
+      setPresentaciones(presentaciones || []);
+      setModalAbierto(true);
+    } catch (err) {
+      console.error("❌ Error al cargar presentaciones:", err.message);
+    }
   };
 
   const guardarCambios = async () => {
-    if (!productoSeleccionado || !precioFinal) return;
+    if (!productoSeleccionado || !precioFinal || !presentacionSeleccionada) return;
 
     try {
       setGuardando(true);
@@ -131,14 +140,15 @@ const PreciosPage = () => {
       const valorBase = aplicaIVA
         ? parseFloat((valorFinal / 1.19).toFixed(2))
         : parseFloat(valorFinal.toFixed(2));
+
       await asignarPrecioProducto({
-        product_id: productoSeleccionado.id,
+        presentation_id: presentacionSeleccionada,
         price: valorBase,
         iva_rate: aplicaIVA ? 19 : 0,
       });
+
       setModalAbierto(false);
-      await obtenerPrecios();                // ✅ Actualiza precios activos
-      await actualizarListadoProductos();    // ✅ Vuelve a cargar todos los productos sin eliminar los vacíos
+      await cargarDatos();
     } catch (error) {
       console.error("❌ Error al guardar precio:", error.message);
     } finally {
@@ -157,6 +167,7 @@ const PreciosPage = () => {
           <TableRow>
             <TableHead>Familia</TableHead>
             <TableHead>Producto</TableHead>
+            <TableHead>Presentación</TableHead>
             <TableHead className="text-right">Precio Base</TableHead>
             <TableHead>IVA</TableHead>
             <TableHead className="text-right">Precio Final</TableHead>
@@ -168,10 +179,16 @@ const PreciosPage = () => {
           {productos.map((p) => {
             const base = p.base_price;
             const final = p.iva_applicable ? base * 1.19 : base;
+            const [nombreProducto, nombrePresentacion] = p.nombre?.split(" – ") ?? [p.nombre, "—"];
+
             return (
               <TableRow key={p.id}>
                 <TableCell>{p.familia}</TableCell>
-                <TableCell>{p.nombre}</TableCell>
+                <TableCell>{nombreProducto}</TableCell>
+                <TableCell className="whitespace-normal break-words max-w-[250px]">
+                  {nombrePresentacion || "—"}
+                </TableCell>
+
                 <TableCell className="text-right">
                   {base !== null ? `$${Math.round(base)}` : "—"}
                 </TableCell>
@@ -188,7 +205,7 @@ const PreciosPage = () => {
                 </TableCell>
                 <TableCell className="text-center">
                   <Button variant="outline" onClick={() => abrirModal(p)}>
-                    Editar
+                    Asignar precio
                   </Button>
                 </TableCell>
               </TableRow>
@@ -199,8 +216,23 @@ const PreciosPage = () => {
 
       <Dialog open={modalAbierto} onOpenChange={setModalAbierto}>
         <DialogContent>
-          <DialogTitle>Asignar precio</DialogTitle>
+          <DialogTitle>Asignar precio a presentación</DialogTitle>
           <div className="flex flex-col gap-3 mt-2">
+            <label className="text-sm font-medium">
+              Seleccione presentación:
+              <select
+                className="w-full p-2 border border-gray-300 rounded-md text-sm mt-1"
+                value={presentacionSeleccionada}
+                onChange={(e) => setPresentacionSeleccionada(e.target.value)}
+              >
+                <option value="">Seleccionar</option>
+                {presentaciones.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.presentation_name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="text-sm font-medium">
               Precio final ($ COP) – incluye IVA:
               <Input
