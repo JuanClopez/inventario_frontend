@@ -1,8 +1,7 @@
-// ✅ src/pages/PreciosPage.jsx – Versión 2.5 (06 jul 2025)
-// 🆕 Columna separada para presentación
-// 🛠️ Corrección de visualización de precios ya ingresados
-// ✅ Alineado con el backend post-migración (solo presentation_id)
-// 🧩 Política de componentes: Todos los cambios deben quedar comentados y con número de versión
+// ✅ src/pages/PreciosPage.jsx – Versión 2.7 (06 jul 2025)
+// 🛠️ Se corrige carga de presentaciones incluso si ya tienen precio asignado
+// ✅ Revisión de combinación lógica basada en product_id, no por nombre
+// 📦 Alineado con backend Supabase y servicios actualizados
 
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
@@ -85,7 +84,7 @@ const PreciosPage = () => {
 
   const cargarDatos = async () => {
     try {
-      const { productos: preciosActivos } = await listarPreciosActivos(); // ✅ compatibilidad backend
+      const { productos: preciosActivos } = await listarPreciosActivos();
 
       const res = await api.get("/productos");
       const productosAll = res.data;
@@ -100,11 +99,10 @@ const PreciosPage = () => {
         presentacion: "",
       }));
 
+      // ✅ Corrección: combinación basada en product_id, no en nombre
       const sinRepetir = nuevos.filter(
         (prod) =>
-          !preciosActivos.some((p) =>
-            p.nombre.startsWith(prod.nombre)
-          )
+          !preciosActivos.some((p) => p.product_id === prod.id)
       );
 
       setProductos([...preciosActivos, ...sinRepetir]);
@@ -123,7 +121,9 @@ const PreciosPage = () => {
     setPresentacionSeleccionada("");
     setAplicaIVA(true);
     try {
-      const presentaciones = await obtenerPresentacionesPorProducto(producto.id);
+      // ✅ Compatibilidad: si producto ya tiene precio, usa product_id; si no, usa id
+      const pid = producto.product_id || producto.id;
+      const presentaciones = await obtenerPresentacionesPorProducto(pid);
       setPresentaciones(presentaciones || []);
       setModalAbierto(true);
     } catch (err) {
@@ -132,11 +132,14 @@ const PreciosPage = () => {
   };
 
   const guardarCambios = async () => {
-    if (!productoSeleccionado || !precioFinal || !presentacionSeleccionada) return;
+    const valorFinal = parseFloat(precioFinal);
+    const tienePresentacion = Boolean(presentacionSeleccionada);
+
+    if (!productoSeleccionado || isNaN(valorFinal) || !tienePresentacion) return;
 
     try {
       setGuardando(true);
-      const valorFinal = parseFloat(precioFinal);
+
       const valorBase = aplicaIVA
         ? parseFloat((valorFinal / 1.19).toFixed(2))
         : parseFloat(valorFinal.toFixed(2));
@@ -188,7 +191,6 @@ const PreciosPage = () => {
                 <TableCell className="whitespace-normal break-words max-w-[250px]">
                   {nombrePresentacion || "—"}
                 </TableCell>
-
                 <TableCell className="text-right">
                   {base !== null ? `$${Math.round(base)}` : "—"}
                 </TableCell>

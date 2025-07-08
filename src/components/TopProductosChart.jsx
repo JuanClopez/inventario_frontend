@@ -1,10 +1,10 @@
 // ✅ Ruta: src/components/TopProductosChart.jsx
 // 📊 Componente: TopProductosChart
-// 📦 Versión: 1.4 – 02 jul 2025
+// 📦 Versión: 1.5 – 06 jul 2025
 // 🔄 Mejoras:
-// - ✅ Manejo del token con axiosInstance
-// - ✅ Captura de errores 401 con mensaje amigable
-// - ✅ Código alineado con política de autenticación
+// - ❌ Se elimina el envío de user_id – se usa req.user.id desde el backend
+// - ✅ Limpieza de props innecesarias
+// - ✅ Consolidación del control de errores
 
 import { useEffect, useState } from 'react';
 import axiosInstance from '../services/axiosInstance';
@@ -20,7 +20,7 @@ import {
   Legend,
 } from 'recharts';
 
-const TopProductosChart = ({ userId }) => {
+const TopProductosChart = () => {
   const [topProductos, setTopProductos] = useState([]);
   const [cantidadVisible, setCantidadVisible] = useState(5);
   const [error, setError] = useState(null);
@@ -35,7 +35,7 @@ const TopProductosChart = ({ userId }) => {
 
     try {
       const { data } = await axiosInstance.get('/ventas/top-productos', {
-        params: { user_id: userId, fecha_inicio, fecha_fin },
+        params: { fecha_inicio, fecha_fin },
       });
 
       if (Array.isArray(data.top_productos)) {
@@ -59,8 +59,8 @@ const TopProductosChart = ({ userId }) => {
   };
 
   useEffect(() => {
-    if (userId) cargarTopProductos();
-  }, [userId]);
+    cargarTopProductos();
+  }, []);
 
   const productosFiltrados = topProductos.slice(0, cantidadVisible);
 

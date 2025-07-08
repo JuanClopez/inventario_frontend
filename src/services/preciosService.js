@@ -1,39 +1,33 @@
-// ✅ src/services/preciosService.js – Versión 1.3 (06 jul 2025)
-// 📦 Servicio centralizado para operaciones de precios
-// 🧩 Ahora devuelve objeto completo: { productos, total, etc }
-// ☑️ Usa api.js como los demás servicios
+// ✅ src/services/preciosService.js – Versión 1.5 (06 jul 2025)
+// 🔧 Eliminado uso de product_id completamente
+// 🧩 100% alineado con backend v2.6 y frontend actualizado
+// 📦 Centralizado con api.js
 
 import api from "./api";
 
-// 🔹 Obtener todos los precios activos con datos del producto
+// 🔹 Obtener todos los precios activos (incluye datos del producto y presentación)
 export const listarPreciosActivos = async () => {
   try {
     const res = await api.get("/precios");
-    return res.data; // Retorna objeto completo, no solo productos
+    return res.data; // { productos: [...] }
   } catch (err) {
     console.error("❌ Error en listarPreciosActivos:", err.message);
     throw err;
   }
 };
 
-// 🔹 Asignar nuevo precio a producto o presentación
+// 🔹 Asignar nuevo precio a una presentación
 export const asignarPrecioProducto = async ({
-  product_id,
   presentation_id,
   price,
   iva_rate,
 }) => {
   try {
     const payload = {
+      presentation_id,
       price,
       iva_rate,
     };
-
-    if (presentation_id) {
-      payload.presentation_id = presentation_id;
-    } else if (product_id) {
-      payload.product_id = product_id;
-    }
 
     const res = await api.post("/precios", payload);
     return res.data;
@@ -43,10 +37,10 @@ export const asignarPrecioProducto = async ({
   }
 };
 
-// 🔹 Obtener precio activo de un solo producto
-export const obtenerPrecioProducto = async (product_id) => {
+// 🔹 Obtener precio activo de una presentación
+export const obtenerPrecioProducto = async (presentation_id) => {
   try {
-    const res = await api.get(`/precios/${product_id}`);
+    const res = await api.get(`/precios/${presentation_id}`);
     return res.data.precio;
   } catch (err) {
     console.error("❌ Error en obtenerPrecioProducto:", err.message);
