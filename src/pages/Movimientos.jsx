@@ -1,14 +1,12 @@
-// ✅ src/pages/Movimientos.jsx – Versión 2.0 (Actualización full con presentación_id)
-// 🧠 Incluye soporte para presentaciones activas, stock, validaciones y carga automática
-// 🔄 Migrado a schema con presentation_id en lugar de product_id
-// 🆕 Visualiza nombre de la presentación en tabla y formulario
-// 🔐 Consulta inventario y movimientos por presentación
+// ✅ VentasCarrito.jsx – Versión 2.8.2 (13 jul 2025)
+// 🛠 Actualización completa con validación de stock, presentación_id y fixes de botón
+// 🔁 Corrige errores de visualización y validación
+// 🧠 Basado en comportamiento funcional de Movimientos.jsx
 
 import { useEffect, useState } from "react";
 import api from "@/services/api";
 
-const Movimientos = () => {
-  const [tipo, setTipo] = useState("salida");
+const VentasCarrito = () => {
   const [familias, setFamilias] = useState([]);
   const [productos, setProductos] = useState([]);
   const [presentaciones, setPresentaciones] = useState([]);
@@ -18,44 +16,42 @@ const Movimientos = () => {
   const [presentacionSeleccionada, setPresentacionSeleccionada] = useState("");
 
   const [cantidad, setCantidad] = useState(1);
-  const [usarUnidades, setUsarUnidades] = useState(false);
-  const [cantidadUnidades, setCantidadUnidades] = useState(0);
-  const [descripcion, setDescripcion] = useState("");
-
   const [stock, setStock] = useState(null);
   const [errorStock, setErrorStock] = useState("");
 
-  const [movimientos, setMovimientos] = useState([]);
+  const [precioUnitario, setPrecioUnitario] = useState(0);
+  const [descuento, setDescuento] = useState(0);
+  const [carrito, setCarrito] = useState([]);
 
-  const [filtroDesde, setFiltroDesde] = useState("");
-  const [filtroHasta, setFiltroHasta] = useState("");
-  const [filtroProducto, setFiltroProducto] = useState("");
-
-  const cargarCatalogos = async () => {
-    try {
-      const [resFamilias, resProductos] = await Promise.all([
-        api.get("/familias"),
-        api.get("/productos"),
-      ]);
-      setFamilias(resFamilias.data);
-      setProductos(resProductos.data);
-    } catch (err) {
-      console.error("❌ Error al cargar catálogos:", err);
-    }
-  };
-
+  // ✅ Cargar familias y productos
   useEffect(() => {
+    const cargarCatalogos = async () => {
+      try {
+        const [resFamilias, resProductos] = await Promise.all([
+          api.get("/familias"),
+          api.get("/productos"),
+        ]);
+        setFamilias(resFamilias.data);
+        setProductos(resProductos.data);
+      } catch (err) {
+        console.error("❌ Error al cargar catálogos:", err);
+      }
+    };
+
     cargarCatalogos();
   }, []);
 
+  // ✅ Reset al cambiar familia
   useEffect(() => {
     setProductoSeleccionado("");
     setPresentaciones([]);
     setPresentacionSeleccionada("");
     setStock(null);
     setErrorStock("");
+    setPrecioUnitario(0);
   }, [familiaSeleccionada]);
 
+  // ✅ Cargar presentaciones al elegir producto
   useEffect(() => {
     const cargarPresentaciones = async () => {
       if (!productoSeleccionado) return;
@@ -65,7 +61,6 @@ const Movimientos = () => {
         );
         const disponibles = data.presentaciones || [];
         setPresentaciones(disponibles);
-
         if (disponibles.length === 1) {
           setPresentacionSeleccionada(disponibles[0].id);
         }
@@ -77,11 +72,13 @@ const Movimientos = () => {
     cargarPresentaciones();
   }, [productoSeleccionado]);
 
+  // ✅ Cargar stock y precio al cambiar presentación
   useEffect(() => {
-    const cargarStock = async () => {
-      if (!presentacionSeleccionada || tipo === "entrada") {
+    const cargarDatosPresentacion = async () => {
+      if (!presentacionSeleccionada) {
         setStock(null);
         setErrorStock("");
+        setPrecioUnitario(0);
         return;
       }
 
@@ -94,123 +91,66 @@ const Movimientos = () => {
           return;
         }
 
-        const { data } = await api.get(
-          `/inventario/${userId}/${presentacionSeleccionada}`
-        );
-        setStock(data);
+        const [resInventario, resPrecio] = await Promise.all([
+          api.get(`/inventario/${userId}/${presentacionSeleccionada}`),
+          api.get(`/precios/${presentacionSeleccionada}`),
+        ]);
+
+        setStock(resInventario.data);
+        setPrecioUnitario(resPrecio.data?.precio_unitario || 0);
         setErrorStock("");
       } catch (err) {
-        console.error("❌ Error al obtener stock:", err);
+        console.error("❌ Error al cargar datos de presentación:", err);
         setStock(null);
-        setErrorStock("❌ No se pudo cargar el stock");
+        setPrecioUnitario(0);
+        setErrorStock("❌ No se pudo cargar el stock o precio");
       }
     };
 
-    cargarStock();
-  }, [presentacionSeleccionada, tipo]);
+    cargarDatosPresentacion();
+  }, [presentacionSeleccionada]);
 
+  // ✅ Validación de cantidad contra stock
   useEffect(() => {
-    if (tipo === "salida" && stock) {
-      const excedeCajas = cantidad > stock.cajas;
-      const excedeUnidades =
-        usarUnidades && cantidadUnidades > stock.unidades;
+    if (!stock) return;
 
-      if (excedeCajas || excedeUnidades) {
-        setErrorStock("❌ La cantidad supera el stock disponible.");
-      } else {
-        setErrorStock("");
-      }
+    const excedeStock = cantidad > stock.cajas;
+
+    if (excedeStock) {
+      setErrorStock("❌ La cantidad supera el stock disponible");
     } else {
       setErrorStock("");
     }
-  }, [cantidad, cantidadUnidades, stock, tipo, usarUnidades]);
+  }, [cantidad, stock]);
 
-  const handleRegistrar = async () => {
-    try {
-      await api.post("/movimientos", {
-        type: tipo,
-        presentation_id: presentacionSeleccionada,
-        quantity_boxes: cantidad,
-        quantity_units: usarUnidades ? cantidadUnidades : 0,
-        description: descripcion.trim(),
-      });
-
-      await cargarMovimientos();
-      resetFormulario();
-    } catch (err) {
-      alert(err.response?.data?.mensaje || "❌ Error al registrar movimiento");
+  // ✅ Agregar al carrito
+  const agregarAlCarrito = () => {
+    if (!presentacionSeleccionada || cantidad <= 0 || !stock || cantidad > stock.cajas) {
+      setErrorStock("❌ No se puede agregar este producto al carrito");
+      return;
     }
-  };
 
-  const resetFormulario = () => {
-    setFamiliaSeleccionada("");
-    setProductoSeleccionado("");
-    setPresentaciones([]);
-    setPresentacionSeleccionada("");
+    const presentacion = presentaciones.find((p) => p.id === presentacionSeleccionada);
+
+    const nuevoItem = {
+      presentation_id: presentacionSeleccionada,
+      nombre: presentacion?.presentation_name || "Sin nombre",
+      cantidad,
+      precioUnitario,
+      descuento,
+      subtotal: (cantidad * precioUnitario * (1 - descuento / 100)).toFixed(2),
+    };
+
+    setCarrito([...carrito, nuevoItem]);
     setCantidad(1);
-    setCantidadUnidades(0);
-    setUsarUnidades(false);
-    setDescripcion("");
-    setStock(null);
     setErrorStock("");
-  };
-
-  const cargarMovimientos = async () => {
-    try {
-      const params = new URLSearchParams();
-      if (filtroDesde) params.append("desde", filtroDesde);
-      if (filtroHasta) params.append("hasta", filtroHasta);
-      if (filtroProducto) params.append("producto", filtroProducto);
-
-      const { data } = await api.get(`/movimientos?${params.toString()}`);
-      setMovimientos(data);
-    } catch (err) {
-      console.error("❌ Error al cargar movimientos:", err);
-    }
-  };
-
-  useEffect(() => {
-    cargarMovimientos();
-  }, []);
-
-  const camposValidos = () => {
-    if (!presentacionSeleccionada || cantidad <= 0) return false;
-    if (tipo === "salida" && stock) {
-      if (cantidad > stock.cajas) return false;
-      if (usarUnidades && cantidadUnidades > stock.unidades) return false;
-    }
-    return true;
   };
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded shadow">
-      <h1 className="text-2xl font-bold text-blue-700 mb-6">
-        Registrar movimiento
-      </h1>
+      <h1 className="text-2xl font-bold text-blue-700 mb-6">Venta rápida</h1>
 
-      <div className="mb-4 flex gap-4">
-        <label>
-          <input
-            type="radio"
-            value="salida"
-            checked={tipo === "salida"}
-            onChange={() => setTipo("salida")}
-            className="mr-2"
-          />
-          Salida
-        </label>
-        <label>
-          <input
-            type="radio"
-            value="entrada"
-            checked={tipo === "entrada"}
-            onChange={() => setTipo("entrada")}
-            className="mr-2"
-          />
-          Entrada
-        </label>
-      </div>
-
+      {/* 🔽 Selectores de familia, producto y presentación */}
       <div className="mb-4">
         <label className="block font-medium mb-1">Familia</label>
         <select
@@ -262,13 +202,15 @@ const Movimientos = () => {
           ))}
         </select>
 
-        {stock && tipo === "salida" && (
+        {/* ✅ Mostrar stock si disponible */}
+        {stock && (
           <p className="text-sm text-gray-600 mt-1">
             Stock actual: {stock.cajas} cajas, {stock.unidades} unidades
           </p>
         )}
       </div>
 
+      {/* 🔽 Campos de cantidad, descuento y validación */}
       <div className="mb-4">
         <label className="block font-medium mb-1">Cantidad (cajas)</label>
         <input
@@ -281,115 +223,62 @@ const Movimientos = () => {
       </div>
 
       <div className="mb-4">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={usarUnidades}
-            onChange={() => setUsarUnidades(!usarUnidades)}
-          />
-          Registrar unidades sueltas
-        </label>
-        {usarUnidades && (
-          <input
-            type="number"
-            min="0"
-            value={cantidadUnidades}
-            onChange={(e) => setCantidadUnidades(Number(e.target.value))}
-            className="mt-2 w-full border rounded px-3 py-2"
-          />
-        )}
-      </div>
-
-      {errorStock && <p className="text-red-600 text-sm">{errorStock}</p>}
-
-      <div className="mb-6">
-        <label className="block font-medium mb-1">Descripción</label>
-        <textarea
-          value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
-          rows="3"
+        <label className="block font-medium mb-1">Descuento (%)</label>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          value={descuento}
+          onChange={(e) => setDescuento(Number(e.target.value))}
           className="w-full border rounded px-3 py-2"
         />
       </div>
 
+      {errorStock && <p className="text-red-600 text-sm">{errorStock}</p>}
+
+      {/* 🔽 Botón agregar */}
       <button
-        onClick={handleRegistrar}
-        disabled={!camposValidos()}
-        className={`btn-base transition-all ${
-          !camposValidos()
+        onClick={agregarAlCarrito}
+        disabled={!presentacionSeleccionada || cantidad <= 0 || errorStock}
+        className={`btn-base mt-2 transition-all ${
+          !presentacionSeleccionada || cantidad <= 0 || errorStock
             ? "bg-gray-400 cursor-not-allowed"
-            : "bg-blue-700 hover:bg-blue-800 text-white"
+            : "bg-green-700 hover:bg-green-800 text-white"
         }`}
       >
-        Registrar movimiento
+        Agregar al carrito
       </button>
 
-      {/* 🔽 Tabla de movimientos recientes */}
-      <div className="mt-10">
-        <h2 className="text-xl font-semibold text-blue-700 mb-4">
-          Movimientos recientes
-        </h2>
-
-        <div className="flex flex-wrap gap-4 mb-4">
-          <input
-            type="date"
-            value={filtroDesde}
-            onChange={(e) => setFiltroDesde(e.target.value)}
-            className="border rounded px-2 py-1"
-          />
-          <input
-            type="date"
-            value={filtroHasta}
-            onChange={(e) => setFiltroHasta(e.target.value)}
-            className="border rounded px-2 py-1"
-          />
-          <input
-            type="text"
-            placeholder="Buscar producto..."
-            value={filtroProducto}
-            onChange={(e) => setFiltroProducto(e.target.value)}
-            className="border rounded px-2 py-1"
-          />
-          <button onClick={cargarMovimientos} className="btn-base">
-            Aplicar filtros
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200">
+      {/* 🔽 Lista de carrito */}
+      {carrito.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4 text-blue-700">Carrito</h2>
+          <table className="min-w-full bg-white border border-gray-200 text-sm">
             <thead className="bg-blue-700 text-white">
               <tr>
-                <th className="text-left px-4 py-2">Fecha</th>
-                <th className="text-left px-4 py-2">Tipo</th>
-                <th className="text-left px-4 py-2">Familia</th>
-                <th className="text-left px-4 py-2">Producto</th>
-                <th className="text-left px-4 py-2">Presentación</th>
-                <th className="text-left px-4 py-2">Cajas</th>
-                <th className="text-left px-4 py-2">Unidades</th>
-                <th className="text-left px-4 py-2">Descripción</th>
+                <th className="px-4 py-2 text-left">Presentación</th>
+                <th className="px-4 py-2 text-left">Cantidad</th>
+                <th className="px-4 py-2 text-left">Precio</th>
+                <th className="px-4 py-2 text-left">Descuento</th>
+                <th className="px-4 py-2 text-left">Subtotal</th>
               </tr>
             </thead>
             <tbody>
-              {movimientos.map((m) => (
-                <tr key={m.id} className="border-t text-sm">
-                  <td className="px-4 py-2">
-                    {new Date(m.fecha).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2 capitalize">{m.tipo}</td>
-                  <td className="px-4 py-2">{m.familia}</td>
-                  <td className="px-4 py-2">{m.producto}</td>
-                  <td className="px-4 py-2">{m.presentacion}</td>
-                  <td className="px-4 py-2">{m.cajas}</td>
-                  <td className="px-4 py-2">{m.unidades}</td>
-                  <td className="px-4 py-2">{m.descripcion}</td>
+              {carrito.map((item, index) => (
+                <tr key={index} className="border-t">
+                  <td className="px-4 py-2">{item.nombre}</td>
+                  <td className="px-4 py-2">{item.cantidad}</td>
+                  <td className="px-4 py-2">${item.precioUnitario}</td>
+                  <td className="px-4 py-2">{item.descuento}%</td>
+                  <td className="px-4 py-2">${item.subtotal}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </div>
+      )}
     </div>
   );
 };
 
-export default Movimientos;
+export default VentasCarrito;

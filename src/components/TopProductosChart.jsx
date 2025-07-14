@@ -1,13 +1,14 @@
 // ✅ Ruta: src/components/TopProductosChart.jsx
 // 📊 Componente: TopProductosChart
-// 📦 Versión: 1.5 – 06 jul 2025
-// 🔄 Mejoras:
-// - ❌ Se elimina el envío de user_id – se usa req.user.id desde el backend
-// - ✅ Limpieza de props innecesarias
-// - ✅ Consolidación del control de errores
+// 📦 Versión: 1.6 – 12 jul 2025
+// 🛠️ Cambios aplicados:
+// - ✅ Ahora acepta `productos` como prop para reutilización en Dashboard
+// - ✅ Conserva fallback a llamada propia si no recibe props
+// - ✅ Alineado con backend modular y resumen maestro v2.7
+// - ✅ Mejor control de errores y consistencia visual
 
 import { useEffect, useState } from 'react';
-import axiosInstance from '../services/axiosInstance';
+import axiosInstance from '@/services/axiosInstance';
 import dayjs from 'dayjs';
 import {
   BarChart,
@@ -20,12 +21,13 @@ import {
   Legend,
 } from 'recharts';
 
-const TopProductosChart = () => {
+const TopProductosChart = ({ productos = null }) => {
   const [topProductos, setTopProductos] = useState([]);
   const [cantidadVisible, setCantidadVisible] = useState(5);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // 🔁 Cargar desde backend si no recibe props
   const cargarTopProductos = async () => {
     setLoading(true);
     setError(null);
@@ -59,13 +61,19 @@ const TopProductosChart = () => {
   };
 
   useEffect(() => {
-    cargarTopProductos();
-  }, []);
+    // Solo carga desde backend si no se pasa por props
+    if (!productos) {
+      cargarTopProductos();
+    } else {
+      setTopProductos(productos);
+    }
+  }, [productos]);
 
   const productosFiltrados = topProductos.slice(0, cantidadVisible);
 
   return (
     <div className="bg-white rounded-xl shadow-md p-5 mt-6">
+      {/* 🔹 Encabezado y control */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-blue-700">
           🥇 Top productos más vendidos
@@ -83,6 +91,7 @@ const TopProductosChart = () => {
         </select>
       </div>
 
+      {/* 🔸 Estados visuales */}
       {loading ? (
         <p className="text-sm text-gray-500">Cargando datos...</p>
       ) : error ? (
