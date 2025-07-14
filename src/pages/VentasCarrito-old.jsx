@@ -1,20 +1,11 @@
-// 📄 VentasCarrito.jsx – Versión 3.3.5
-// 📅 Fecha: 14-jul-2025
-// ✅ Corrige fórmula precisa para discriminar IVA desde valor con IVA (con decimales en lógica, redondeo en vista)
-// ✅ Lógica base sin IVA: precioConIva / (1 + ivaRate) | IVA: total - base
-// ✅ Conserva estructura visual y cálculo de totales sin cambios estructurales
-// ✅ Cumple con políticas del Resumen Maestro 2.7
+// 📄 VentasCarrito.jsx – Versión 3.2.0
+// 📅 Fecha: 13-jul-2025
+// ✅ Soporta datos incompletos desde el backend (precio_base, iva, precio_con_iva)
+// 🔒 Refuerza validaciones para evitar errores si faltan campos o llegan valores nulos
+// 🔄 Aplica redondeo seguro en todos los cálculos
 
 import { useEffect, useState } from "react";
 import api from "@/services/api";
-import { toast } from "react-toastify";
-
-const formatCOP = (valor) =>
-  new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(Math.round(valor));
 
 const VentasCarrito = () => {
   const [familias, setFamilias] = useState([]);
@@ -33,7 +24,6 @@ const VentasCarrito = () => {
   const [errorStock, setErrorStock] = useState("");
   const [carrito, setCarrito] = useState([]);
   const [descuento, setDescuento] = useState(0);
-  const [descripcionVenta, setDescripcionVenta] = useState("");
 
   const userId = JSON.parse(localStorage.getItem("userData"))?.user?.id;
 
@@ -67,9 +57,7 @@ const VentasCarrito = () => {
     const cargarPresentaciones = async () => {
       if (!productoSeleccionado) return;
       try {
-        const { data } = await api.get(
-          `/presentaciones/${productoSeleccionado}`
-        );
+        const { data } = await api.get(`/presentaciones/${productoSeleccionado}`);
         const presentacionesActivas = data.presentaciones || [];
         setPresentaciones(presentacionesActivas);
         if (presentacionesActivas.length === 1) {
@@ -86,9 +74,7 @@ const VentasCarrito = () => {
     const cargarStock = async () => {
       if (!presentacionSeleccionada || !userId) return;
       try {
-        const { data } = await api.get(
-          `/inventario/${userId}/${presentacionSeleccionada}`
-        );
+        const { data } = await api.get(`/inventario/${userId}/${presentacionSeleccionada}`);
         setStock(data);
         setErrorStock("");
       } catch (err) {
@@ -104,9 +90,7 @@ const VentasCarrito = () => {
     const cargarPrecio = async () => {
       if (!presentacionSeleccionada || !productoSeleccionado) return;
       try {
-        const { data } = await api.get(
-          `/precios/${productoSeleccionado}/${presentacionSeleccionada}`
-        );
+        const { data } = await api.get(`/precios/${productoSeleccionado}/${presentacionSeleccionada}`);
         if (!data) {
           alert("❌ Esta presentación no tiene precio asignado.");
           setPrecioBase(0);
@@ -139,34 +123,24 @@ const VentasCarrito = () => {
 
   const stockSuficiente = stock && cantidad <= stock.cajas;
 
-  // ✅ Cálculo actualizado según fórmula oficial
   const calcularItemVenta = () => {
-    const totalBruto = precioConIva * cantidad;
-    const descuentoTotal = +(totalBruto * (descuento / 100)).toFixed(4);
-    const totalNeto = +(totalBruto - descuentoTotal).toFixed(4);
+    const netoBruto = precioBase * cantidad;
+    const descuentoTotal = Math.round(netoBruto * (descuento / 100));
+    const netoFinal = netoBruto - descuentoTotal;
+    const ivaTotal = Math.round(netoFinal * ivaRate);
+    const total = netoFinal + ivaTotal;
 
-    const baseSinIva = +(totalNeto / (1 + ivaRate / 100)).toFixed(4);
-    const ivaTotal = +(totalNeto - baseSinIva).toFixed(4);
-
-    return { baseSinIva, ivaTotal, descuentoTotal, total: totalNeto };
+    return { netoFinal, ivaTotal, descuentoTotal, total };
   };
 
   const agregarAlCarrito = () => {
-    if (
-      !stockSuficiente ||
-      !presentacionSeleccionada ||
-      cantidad <= 0 ||
-      precioBase === 0
-    )
-      return;
+    if (!stockSuficiente || !presentacionSeleccionada || cantidad <= 0 || precioBase === 0) return;
 
-    const presentacion = presentaciones.find(
-      (p) => p.id === presentacionSeleccionada
-    );
+    const presentacion = presentaciones.find((p) => p.id === presentacionSeleccionada);
     const producto = productos.find((p) => p.id === productoSeleccionado);
     const familia = familias.find((f) => f.name === familiaSeleccionada);
 
-    const { baseSinIva, ivaTotal, descuentoTotal, total } = calcularItemVenta();
+    const { netoFinal, ivaTotal, descuentoTotal, total } = calcularItemVenta();
 
     const nuevoItem = {
       id: crypto.randomUUID(),
@@ -177,13 +151,12 @@ const VentasCarrito = () => {
       cantidad,
       precio_unitario: precioConIva,
       descuento_total: descuentoTotal,
-      subtotal: baseSinIva,
+      subtotal: netoFinal,
       iva_total: ivaTotal,
       total,
     };
 
     setCarrito([...carrito, nuevoItem]);
-    setFamiliaSeleccionada("");
     setProductoSeleccionado("");
     setPresentacionSeleccionada("");
     setCantidad(1);
@@ -199,43 +172,14 @@ const VentasCarrito = () => {
 
   const totalNeto = carrito.reduce((sum, item) => sum + item.subtotal, 0);
   const totalIVA = carrito.reduce((sum, item) => sum + item.iva_total, 0);
-  const totalDescuentos = carrito.reduce(
-    (sum, item) => sum + item.descuento_total,
-    0
-  );
+  const totalDescuentos = carrito.reduce((sum, item) => sum + item.descuento_total, 0);
   const totalVenta = carrito.reduce((sum, item) => sum + item.total, 0);
-
-  const handleRegistrarVenta = async () => {
-    if (carrito.length === 0) return;
-
-    try {
-      const venta = {
-        description: descripcionVenta,
-        items: carrito.map((item) => ({
-          presentation_id: item.presentacion_id,
-          quantity_boxes: item.cantidad,
-          quantity_units: 0,
-          discount: item.descuento_total,
-        })),
-      };
-
-      await api.post("/ventas", venta);
-      toast.success("✅ Venta registrada correctamente");
-      setCarrito([]);
-      setDescripcionVenta("");
-    } catch (err) {
-      console.error("❌ Error al registrar venta:", err);
-      toast.error("Error al registrar venta");
-    }
-  };
 
   return (
     <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow">
-      <h1 className="text-2xl font-bold text-blue-700 mb-6">
-        Ventas (Carrito)
-      </h1>
+      <h1 className="text-2xl font-bold text-blue-700 mb-6">Ventas (Carrito)</h1>
 
-      {/* --- Formulario --- */}
+      {/* Formulario */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label>Familia</label>
@@ -246,12 +190,11 @@ const VentasCarrito = () => {
           >
             <option value="">Selecciona</option>
             {familias.map((f) => (
-              <option key={f.id} value={f.name}>
-                {f.name}
-              </option>
+              <option key={f.id} value={f.name}>{f.name}</option>
             ))}
           </select>
         </div>
+
         <div>
           <label>Producto</label>
           <select
@@ -264,12 +207,11 @@ const VentasCarrito = () => {
             {productos
               .filter((p) => p.familia === familiaSeleccionada)
               .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
           </select>
         </div>
+
         <div>
           <label>Presentación</label>
           <select
@@ -280,9 +222,7 @@ const VentasCarrito = () => {
           >
             <option value="">Selecciona</option>
             {presentaciones.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.presentation_name}
-              </option>
+              <option key={p.id} value={p.id}>{p.presentation_name}</option>
             ))}
           </select>
           {stock && (
@@ -292,6 +232,7 @@ const VentasCarrito = () => {
           )}
           {errorStock && <p className="text-sm text-red-600">{errorStock}</p>}
         </div>
+
         <div>
           <label>Cantidad</label>
           <input
@@ -302,6 +243,7 @@ const VentasCarrito = () => {
             className="w-full border rounded px-3 py-2"
           />
         </div>
+
         <div>
           <label>Precio (con IVA)</label>
           <input
@@ -311,6 +253,7 @@ const VentasCarrito = () => {
             className="w-full border rounded px-3 py-2 bg-gray-100"
           />
         </div>
+
         <div>
           <label>Descuento (%)</label>
           <input
@@ -322,26 +265,16 @@ const VentasCarrito = () => {
             className="w-full border rounded px-3 py-2"
           />
         </div>
-        <div className="md:col-span-3">
-          <label className="block text-sm font-medium">
-            Descripción de la venta
-          </label>
-          <input
-            type="text"
-            value={descripcionVenta}
-            onChange={(e) => setDescripcionVenta(e.target.value)}
-            className="w-full border rounded px-3 py-2"
-            placeholder="Ej: Venta julio"
-          />
-        </div>
       </div>
 
       <button
         onClick={agregarAlCarrito}
-        disabled={
+        disabled={!stockSuficiente || !presentacionSeleccionada || precioBase === 0}
+        className={`mt-4 px-4 py-2 rounded text-white ${
           !stockSuficiente || !presentacionSeleccionada || precioBase === 0
-        }
-        className={`mt-4 px-4 py-2 rounded text-white ${!stockSuficiente || !presentacionSeleccionada || precioBase === 0 ? "bg-gray-400 cursor-not-allowed" : "bg-blue-700 hover:bg-blue-800"}`}
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-blue-700 hover:bg-blue-800"
+        }`}
       >
         Agregar al carrito
       </button>
@@ -358,7 +291,7 @@ const VentasCarrito = () => {
                 <th>Cant.</th>
                 <th>Precio</th>
                 <th>Descuento</th>
-                <th>Base sin IVA</th>
+                <th>Subtotal</th>
                 <th>IVA</th>
                 <th>Total</th>
                 <th></th>
@@ -371,14 +304,11 @@ const VentasCarrito = () => {
                   <td>{item.nombre_producto}</td>
                   <td>{item.nombre_presentacion}</td>
                   <td>{item.cantidad}</td>
-                  <td>{formatCOP(item.precio_unitario)}</td>
-                  <td>{formatCOP(item.descuento_total)}</td>
-                  <td>{formatCOP(item.subtotal)}</td>{" "}
-                  {/* ✅ redondeado visual */}
-                  <td>{formatCOP(item.iva_total)}</td>{" "}
-                  {/* ✅ redondeado visual */}
-                  <td className="font-bold">{formatCOP(item.total)}</td>{" "}
-                  {/* ✅ redondeado visual */}
+                  <td>${item.precio_unitario}</td>
+                  <td>${item.descuento_total}</td>
+                  <td>${item.subtotal}</td>
+                  <td>${item.iva_total}</td>
+                  <td className="font-bold">${item.total}</td>
                   <td>
                     <button
                       onClick={() => eliminarItem(item.id)}
@@ -393,29 +323,10 @@ const VentasCarrito = () => {
           </table>
 
           <div className="mt-4 text-right space-y-1">
-            <p>
-              Base sin IVA total: <strong>{formatCOP(totalNeto)}</strong>
-            </p>{" "}
-            {/* ✅ redondeado visual */}
-            <p>
-              IVA total: <strong>{formatCOP(totalIVA)}</strong>
-            </p>{" "}
-            {/* ✅ redondeado visual */}
-            <p>
-              Descuentos totales: <strong>{formatCOP(totalDescuentos)}</strong>
-            </p>
-            <p>
-              Total venta: <strong>{formatCOP(totalVenta)}</strong>
-            </p>
-          </div>
-          <div className="text-right mt-6">
-            <button
-              onClick={handleRegistrarVenta}
-              disabled={carrito.length === 0}
-              className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
-            >
-              Registrar venta del carrito
-            </button>
+            <p>Subtotal neto: <strong>${Math.round(totalNeto)}</strong></p>
+            <p>IVA total: <strong>${Math.round(totalIVA)}</strong></p>
+            <p>Descuentos totales: <strong>${Math.round(totalDescuentos)}</strong></p>
+            <p>Total venta: <strong>${Math.round(totalVenta)}</strong></p>
           </div>
         </div>
       )}
