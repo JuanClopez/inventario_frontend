@@ -1,31 +1,48 @@
-// 📄 VentasCarrito.jsx – Versión 3.3.5
-// 📅 Fecha: 14-jul-2025
-// ✅ Corrige fórmula precisa para discriminar IVA desde valor con IVA (con decimales en lógica, redondeo en vista)
-// ✅ Lógica base sin IVA: precioConIva / (1 + ivaRate) | IVA: total - base
-// ✅ Conserva estructura visual y cálculo de totales sin cambios estructurales
-// ✅ Cumple con políticas del Resumen Maestro 2.7
+// 📄 src/pages/VentasCarrito.jsx
+// ─────────────────────────────────────────────────────────────────────────────
+// Versión: 3.3.7
+// Fecha: 15-Agosto-2025
+// Resumen Maestro 2.7 – Cumplido (comentado y trazable)
+// Cambios respecto a 3.3.5 / 3.3.6:
+//   1) 🛡️ Anti-doble clic en “Registrar venta” + idempotencia (X-Idempotency-Key).
+//   2) 📦 Se envía también product_id junto con presentation_id en cada item.
+//   3) 🔎 Logs detallados (console.groupCollapsed) en carga y acciones críticas.
+//   4) 👁️ Redondeo solo visual (formatCOP redondea), cálculos siguen con decimales.
+//   5) 🧮 Fórmula IVA correcta: base = totalNeto / (1 + ivaRate/100), IVA = total - base.
+//   6) ✅ Mantiene endpoints y estructura original (no rompe backend actual).
+// Notas de implementación:
+//   - El backend actual (/api/ventas) ya descuenta inventario vía RPC; el FE no duplica.
+//   - Si agregas soporte en backend, podrás usar el product_id que ya enviamos.
+//   - La idempotencia requiere soporte backend para ser total; aquí prevenimos doble clic
+//     y enviamos cabecera “X-Idempotency-Key” (inocua si backend la ignora).
+// ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import api from "@/services/api";
 import { toast } from "react-toastify";
 
+// 👁️ Redondeo solo visual (sin decimales en UI)
 const formatCOP = (valor) =>
   new Intl.NumberFormat("es-CO", {
     style: "currency",
     currency: "COP",
     minimumFractionDigits: 0,
-  }).format(Math.round(valor));
+    maximumFractionDigits: 0,
+  }).format(Math.round(Number(valor || 0)));
 
 const VentasCarrito = () => {
+  // ───── Catálogos y dependencias ────────────────────────────────────────────
   const [familias, setFamilias] = useState([]);
   const [productos, setProductos] = useState([]);
   const [presentaciones, setPresentaciones] = useState([]);
 
+  // ───── Selecciones de UI ──────────────────────────────────────────────────
   const [familiaSeleccionada, setFamiliaSeleccionada] = useState("");
   const [productoSeleccionado, setProductoSeleccionado] = useState("");
   const [presentacionSeleccionada, setPresentacionSeleccionada] = useState("");
   const [cantidad, setCantidad] = useState(1);
 
+  // ───── Datos operativos ───────────────────────────────────────────────────
   const [stock, setStock] = useState(null);
   const [precioBase, setPrecioBase] = useState(0);
   const [ivaRate, setIvaRate] = useState(0);
@@ -35,25 +52,54 @@ const VentasCarrito = () => {
   const [descuento, setDescuento] = useState(0);
   const [descripcionVenta, setDescripcionVenta] = useState("");
 
-  const userId = JSON.parse(localStorage.getItem("userData"))?.user?.id;
+  // ───── Control envío / idempotencia ───────────────────────────────────────
+  const [guardando, setGuardando] = useState(false);
+  const envioEnCursoRef = useRef(false);
+  const ultimaFirmaVentaRef = useRef(null);
 
+  const userId = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("userData"))?.user?.id || null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // ───── Utilidades de logs ─────────────────────────────────────────────────
+  const logGroup = (title, obj) => {
+    try {
+      console.groupCollapsed(title);
+      if (obj !== undefined) console.log(obj);
+      console.groupEnd();
+    } catch (_) {
+      // noop
+    }
+  };
+
+  // ───── Carga catálogos: familias y productos ──────────────────────────────
   useEffect(() => {
-    const cargarCatalogos = async () => {
+    (async () => {
       try {
+        console.groupCollapsed("📦 Carga inicial de catálogos");
         const [resFamilias, resProductos] = await Promise.all([
           api.get("/familias"),
           api.get("/productos"),
         ]);
-        setFamilias(resFamilias.data);
-        setProductos(resProductos.data);
+        console.log("Familias:", resFamilias.data);
+        console.log("Productos:", resProductos.data);
+        setFamilias(resFamilias.data || []);
+        setProductos(resProductos.data || []);
+        console.groupEnd();
       } catch (err) {
         console.error("❌ Error al cargar catálogos:", err);
+        toast.error("Error al cargar catálogos");
       }
-    };
-    cargarCatalogos();
+    })();
   }, []);
 
+  // ───── Reset por cambio de familia ────────────────────────────────────────
   useEffect(() => {
+    console.info("🔁 Cambio de familia -> reseteo de dependencias");
     setProductoSeleccionado("");
     setPresentaciones([]);
     setPresentacionSeleccionada("");
@@ -63,54 +109,74 @@ const VentasCarrito = () => {
     setDescuento(0);
   }, [familiaSeleccionada]);
 
+  // ───── Cargar presentaciones por producto ─────────────────────────────────
   useEffect(() => {
-    const cargarPresentaciones = async () => {
+    (async () => {
       if (!productoSeleccionado) return;
       try {
+        console.groupCollapsed("📦 Cargando presentaciones");
+        console.log("Producto:", productoSeleccionado);
         const { data } = await api.get(
           `/presentaciones/${productoSeleccionado}`
         );
-        const presentacionesActivas = data.presentaciones || [];
+        const presentacionesActivas = data?.presentaciones || [];
+        console.log("Presentaciones:", presentacionesActivas);
         setPresentaciones(presentacionesActivas);
         if (presentacionesActivas.length === 1) {
           setPresentacionSeleccionada(presentacionesActivas[0].id);
         }
+        console.groupEnd();
       } catch (err) {
         console.error("❌ Error al cargar presentaciones:", err);
+        toast.error("Error al cargar presentaciones");
       }
-    };
-    cargarPresentaciones();
+    })();
   }, [productoSeleccionado]);
 
+  // ───── Cargar stock de la presentación para el usuario ────────────────────
   useEffect(() => {
-    const cargarStock = async () => {
+    (async () => {
       if (!presentacionSeleccionada || !userId) return;
       try {
+        console.groupCollapsed("📊 Cargando stock");
+        console.log("User:", userId, "Presentación:", presentacionSeleccionada);
         const { data } = await api.get(
           `/inventario/${userId}/${presentacionSeleccionada}`
         );
-        setStock(data);
+        console.log("Stock:", data);
+        setStock(data || null);
         setErrorStock("");
+        console.groupEnd();
       } catch (err) {
         console.error("❌ Error al cargar stock:", err);
         setStock(null);
         setErrorStock("❌ No se pudo cargar el stock");
       }
-    };
-    cargarStock();
+    })();
   }, [presentacionSeleccionada, userId]);
 
+  // ───── Cargar precio (base, IVA%, con IVA) ────────────────────────────────
   useEffect(() => {
-    const cargarPrecio = async () => {
+    (async () => {
       if (!presentacionSeleccionada || !productoSeleccionado) return;
       try {
+        console.groupCollapsed("💰 Cargando precio");
+        console.log(
+          "Producto:",
+          productoSeleccionado,
+          "Presentación:",
+          presentacionSeleccionada
+        );
         const { data } = await api.get(
           `/precios/${productoSeleccionado}/${presentacionSeleccionada}`
         );
+        console.log("Respuesta precio:", data);
+
         if (!data) {
           alert("❌ Esta presentación no tiene precio asignado.");
           setPrecioBase(0);
           setPrecioConIva(0);
+          console.groupEnd();
           return;
         }
 
@@ -122,43 +188,73 @@ const VentasCarrito = () => {
           alert("❌ Precio inválido o no asignado para esta presentación.");
           setPrecioBase(0);
           setPrecioConIva(0);
+          console.groupEnd();
           return;
         }
 
         setPrecioBase(precio);
         setIvaRate(iva);
-        setPrecioConIva(Math.round(conIva));
+        setPrecioConIva(Math.round(conIva)); // 👁️ visual más homogéneo
+        console.groupEnd();
       } catch (err) {
         console.error("❌ Error al cargar precio:", err);
         setPrecioBase(0);
         setPrecioConIva(0);
       }
-    };
-    cargarPrecio();
+    })();
   }, [presentacionSeleccionada, productoSeleccionado]);
 
-  const stockSuficiente = stock && cantidad <= stock.cajas;
+  // ───── Helpers y validaciones ─────────────────────────────────────────────
+  const stockSuficiente =
+    stock && cantidad > 0 && cantidad <= (stock.cajas || 0);
 
-  // ✅ Cálculo actualizado según fórmula oficial
+  // 🧮 Cálculo con decimales (toFixed para estabilidad, no para UI)
   const calcularItemVenta = () => {
-    const totalBruto = precioConIva * cantidad;
-    const descuentoTotal = +(totalBruto * (descuento / 100)).toFixed(4);
+    const totalBruto = Number(precioConIva) * Number(cantidad || 0);
+    const descuentoTotal = +(
+      totalBruto *
+      (Number(descuento || 0) / 100)
+    ).toFixed(4);
     const totalNeto = +(totalBruto - descuentoTotal).toFixed(4);
 
-    const baseSinIva = +(totalNeto / (1 + ivaRate / 100)).toFixed(4);
+    const baseSinIva = +(totalNeto / (1 + Number(ivaRate || 0) / 100)).toFixed(
+      4
+    );
     const ivaTotal = +(totalNeto - baseSinIva).toFixed(4);
 
     return { baseSinIva, ivaTotal, descuentoTotal, total: totalNeto };
   };
 
+  // Firma idempotente del carrito (misma venta -> misma firma)
+  const firmaVenta = useMemo(() => {
+    try {
+      const base = JSON.stringify({
+        descripcionVenta,
+        items: carrito.map((i) => ({
+          presentacion_id: i.presentacion_id,
+          product_id: i.product_id,
+          cantidad: i.cantidad,
+          precio_unitario: i.precio_unitario,
+          descuento_total: i.descuento_total,
+        })),
+      });
+      return btoa(unescape(encodeURIComponent(base))).slice(0, 64);
+    } catch {
+      return null;
+    }
+  }, [carrito, descripcionVenta]);
+
+  // ───── Acciones de UI ─────────────────────────────────────────────────────
   const agregarAlCarrito = () => {
     if (
       !stockSuficiente ||
       !presentacionSeleccionada ||
       cantidad <= 0 ||
       precioBase === 0
-    )
+    ) {
+      toast.warning("Verifica cantidad, selección y stock.");
       return;
+    }
 
     const presentacion = presentaciones.find(
       (p) => p.id === presentacionSeleccionada
@@ -166,25 +262,37 @@ const VentasCarrito = () => {
     const producto = productos.find((p) => p.id === productoSeleccionado);
     const familia = familias.find((f) => f.name === familiaSeleccionada);
 
+    if (!presentacion || !producto) {
+      toast.error("No se encontró la presentación o el producto.");
+      return;
+    }
+
     const { baseSinIva, ivaTotal, descuentoTotal, total } = calcularItemVenta();
 
     const nuevoItem = {
       id: crypto.randomUUID(),
+      // 🧷 IDs para doble FK en backend
       presentacion_id: presentacionSeleccionada,
-      nombre_presentacion: presentacion?.presentation_name,
-      nombre_producto: producto?.name,
-      nombre_familia: familia?.name,
+      product_id: producto.id, // ← se envía al backend
+
+      // Metadatos de UI
+      nombre_presentacion: presentacion.presentation_name,
+      nombre_producto: producto.name,
+      nombre_familia: familia?.name || "",
+
+      // Cantidades y montos (lógica con decimales)
       cantidad,
-      precio_unitario: precioConIva,
+      precio_unitario: Number(precioConIva),
       descuento_total: descuentoTotal,
       subtotal: baseSinIva,
       iva_total: ivaTotal,
       total,
     };
 
-    setCarrito([...carrito, nuevoItem]);
-    setFamiliaSeleccionada("");
-    setProductoSeleccionado("");
+    logGroup("🛒 Agregar al carrito", nuevoItem);
+    setCarrito((prev) => [...prev, nuevoItem]);
+
+    // Reset mínimos del formulario (mantengo familia/producto seleccionados para agilizar)
     setPresentacionSeleccionada("");
     setCantidad(1);
     setStock(null);
@@ -194,49 +302,102 @@ const VentasCarrito = () => {
   };
 
   const eliminarItem = (id) => {
-    setCarrito(carrito.filter((item) => item.id !== id));
+    logGroup("🗑️ Eliminar item", { id });
+    setCarrito((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const totalNeto = carrito.reduce((sum, item) => sum + item.subtotal, 0);
-  const totalIVA = carrito.reduce((sum, item) => sum + item.iva_total, 0);
-  const totalDescuentos = carrito.reduce(
-    (sum, item) => sum + item.descuento_total,
+  // Totales a partir del carrito (decimales internamente)
+  const totalNeto = carrito.reduce(
+    (sum, item) => sum + Number(item.subtotal || 0),
     0
   );
-  const totalVenta = carrito.reduce((sum, item) => sum + item.total, 0);
+  const totalIVA = carrito.reduce(
+    (sum, item) => sum + Number(item.iva_total || 0),
+    0
+  );
+  const totalDescuentos = carrito.reduce(
+    (sum, item) => sum + Number(item.descuento_total || 0),
+    0
+  );
+  const totalVenta = carrito.reduce(
+    (sum, item) => sum + Number(item.total || 0),
+    0
+  );
 
+  // ───── Registrar venta (anti-doble envío + idempotencia) ──────────────────
   const handleRegistrarVenta = async () => {
-    if (carrito.length === 0) return;
+    if (carrito.length === 0) {
+      toast.warning("No hay productos en el carrito");
+      return;
+    }
+
+    // Prevención doble clic en FE
+    if (guardando || envioEnCursoRef.current) {
+      console.warn("⛔ Envío ya en curso. Se ignora clic duplicado.");
+      return;
+    }
+
+    // Prevención de reintentos con la misma firma
+    if (firmaVenta && ultimaFirmaVentaRef.current === firmaVenta) {
+      console.warn("⛔ Venta con misma firma ya enviada. Evitando duplicado.");
+      toast.info("La venta ya fue enviada. Espera confirmación.");
+      return;
+    }
+
+    const idempotencyKey = crypto.randomUUID();
+    logGroup("🚀 Registrar venta: inicio", {
+      descripcionVenta,
+      items: carrito,
+      idempotencyKey,
+      firmaVenta,
+    });
 
     try {
-      const venta = {
+      setGuardando(true);
+      envioEnCursoRef.current = true;
+
+      // Payload para backend actual (manteniendo estructura)
+      const ventaPayload = {
         description: descripcionVenta,
         items: carrito.map((item) => ({
           presentation_id: item.presentacion_id,
+          product_id: item.product_id, // ← ya viaja al backend (lo puedes usar)
           quantity_boxes: item.cantidad,
           quantity_units: 0,
           discount: item.descuento_total,
         })),
       };
 
-      await api.post("/ventas", venta);
+      // Si tu wrapper api permite headers: api.post(url, data, { headers: {} })
+      // Si no, puedes adaptar el servicio para soportarlo (inocuo si backend lo ignora)
+      const resp = await api.post("/ventas", ventaPayload, {
+        headers: { "X-Idempotency-Key": idempotencyKey },
+      });
+
+      logGroup("✅ Registrar venta: éxito", resp?.data);
+      ultimaFirmaVentaRef.current = firmaVenta;
       toast.success("✅ Venta registrada correctamente");
       setCarrito([]);
       setDescripcionVenta("");
     } catch (err) {
-      console.error("❌ Error al registrar venta:", err);
+      console.error("🛑 Error al registrar venta:", err);
       toast.error("Error al registrar venta");
+    } finally {
+      envioEnCursoRef.current = false;
+      setGuardando(false);
     }
   };
 
+  // ───── Render ─────────────────────────────────────────────────────────────
   return (
     <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow">
       <h1 className="text-2xl font-bold text-blue-700 mb-6">
         Ventas (Carrito)
       </h1>
 
-      {/* --- Formulario --- */}
+      {/* ─── Formulario ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Familia */}
         <div>
           <label>Familia</label>
           <select
@@ -252,6 +413,8 @@ const VentasCarrito = () => {
             ))}
           </select>
         </div>
+
+        {/* Producto */}
         <div>
           <label>Producto</label>
           <select
@@ -270,6 +433,8 @@ const VentasCarrito = () => {
               ))}
           </select>
         </div>
+
+        {/* Presentación */}
         <div>
           <label>Presentación</label>
           <select
@@ -285,6 +450,7 @@ const VentasCarrito = () => {
               </option>
             ))}
           </select>
+
           {stock && (
             <p className="text-sm text-gray-600 mt-1">
               Stock disponible: {stock.cajas} cajas
@@ -292,6 +458,8 @@ const VentasCarrito = () => {
           )}
           {errorStock && <p className="text-sm text-red-600">{errorStock}</p>}
         </div>
+
+        {/* Cantidad */}
         <div>
           <label>Cantidad</label>
           <input
@@ -302,6 +470,8 @@ const VentasCarrito = () => {
             className="w-full border rounded px-3 py-2"
           />
         </div>
+
+        {/* Precio con IVA (visual) */}
         <div>
           <label>Precio (con IVA)</label>
           <input
@@ -311,6 +481,8 @@ const VentasCarrito = () => {
             className="w-full border rounded px-3 py-2 bg-gray-100"
           />
         </div>
+
+        {/* % Descuento */}
         <div>
           <label>Descuento (%)</label>
           <input
@@ -322,6 +494,8 @@ const VentasCarrito = () => {
             className="w-full border rounded px-3 py-2"
           />
         </div>
+
+        {/* Descripción */}
         <div className="md:col-span-3">
           <label className="block text-sm font-medium">
             Descripción de la venta
@@ -336,19 +510,29 @@ const VentasCarrito = () => {
         </div>
       </div>
 
+      {/* Agregar al carrito */}
       <button
         onClick={agregarAlCarrito}
         disabled={
           !stockSuficiente || !presentacionSeleccionada || precioBase === 0
         }
-        className={`mt-4 px-4 py-2 rounded text-white ${!stockSuficiente || !presentacionSeleccionada || precioBase === 0 ? "bg-gray-400 cursor-not-allowed" : "bg-blue-700 hover:bg-blue-800"}`}
+        className={`mt-4 px-4 py-2 rounded text-white ${
+          !stockSuficiente || !presentacionSeleccionada || precioBase === 0
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-blue-700 hover:bg-blue-800"
+        }`}
+        aria-disabled={
+          !stockSuficiente || !presentacionSeleccionada || precioBase === 0
+        }
       >
         Agregar al carrito
       </button>
 
+      {/* ─── Carrito ───────────────────────────────────────────────────────── */}
       {carrito.length > 0 && (
         <div className="mt-8">
           <h2 className="text-xl font-semibold mb-4">Resumen del carrito</h2>
+
           <table className="min-w-full border text-sm">
             <thead className="bg-blue-100">
               <tr>
@@ -374,15 +558,16 @@ const VentasCarrito = () => {
                   <td>{formatCOP(item.precio_unitario)}</td>
                   <td>{formatCOP(item.descuento_total)}</td>
                   <td>{formatCOP(item.subtotal)}</td>{" "}
-                  {/* ✅ redondeado visual */}
+                  {/* 👁️ redondeado visual */}
                   <td>{formatCOP(item.iva_total)}</td>{" "}
-                  {/* ✅ redondeado visual */}
+                  {/* 👁️ redondeado visual */}
                   <td className="font-bold">{formatCOP(item.total)}</td>{" "}
-                  {/* ✅ redondeado visual */}
+                  {/* 👁️ redondeado visual */}
                   <td>
                     <button
                       onClick={() => eliminarItem(item.id)}
                       className="text-red-600 hover:scale-110 text-lg"
+                      title="Eliminar"
                     >
                       ❌
                     </button>
@@ -392,15 +577,16 @@ const VentasCarrito = () => {
             </tbody>
           </table>
 
+          {/* Totales */}
           <div className="mt-4 text-right space-y-1">
             <p>
               Base sin IVA total: <strong>{formatCOP(totalNeto)}</strong>
             </p>{" "}
-            {/* ✅ redondeado visual */}
+            {/* 👁️ redondeado visual */}
             <p>
               IVA total: <strong>{formatCOP(totalIVA)}</strong>
             </p>{" "}
-            {/* ✅ redondeado visual */}
+            {/* 👁️ redondeado visual */}
             <p>
               Descuentos totales: <strong>{formatCOP(totalDescuentos)}</strong>
             </p>
@@ -408,13 +594,20 @@ const VentasCarrito = () => {
               Total venta: <strong>{formatCOP(totalVenta)}</strong>
             </p>
           </div>
+
+          {/* Registrar venta */}
           <div className="text-right mt-6">
             <button
               onClick={handleRegistrarVenta}
-              disabled={carrito.length === 0}
-              className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
+              disabled={guardando}
+              className={`px-6 py-2 text-white rounded ${
+                guardando
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-green-600 hover:bg-green-700"
+              }`}
+              aria-disabled={guardando}
             >
-              Registrar venta del carrito
+              {guardando ? "Registrando..." : "Registrar venta del carrito"}
             </button>
           </div>
         </div>
